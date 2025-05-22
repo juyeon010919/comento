@@ -148,14 +148,16 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	    test1.field.a = 1;
-	    i2c_tx_data = test1.Pmic_data;
-    /* USER CODE END WHILE */
-	HAL_I2C_Master_Transmit(); /* 매개 변수를 채워주세요 */
+      test1.field.a = 1;
+      i2c_tx_data = test1.Pmic_data;
 
-	HAL_I2C_Master_Receive(); /* 매개 변수를 채워주세요 */
+      uint8_t i2c_tx_data = 0x55;
+      uint8_t i2c_rx_data = 0x00;
 
-    /* USER CODE BEGIN 3 */
+      HAL_I2C_Master_Transmit(&hi2c1, 0xA0, &i2c_tx_data, 1, 1000);
+      HAL_I2C_Master_Receive(&hi2c1, 0xA0, &i2c_rx_data, 1, 1000);
+
+      HAL_Delay(1000);  // 반복 방지용 딜레이
   }
   /* USER CODE END 3 */
 }
