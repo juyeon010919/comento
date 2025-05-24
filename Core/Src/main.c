@@ -153,8 +153,24 @@ int main(void)
 
       uint8_t i2c_tx_data = 0x55;
       uint8_t i2c_rx_data = 0x00;
-
+      /**
+       * @brief  I2C 슬레이브 장치에 데이터를 전송하는 함수
+       * @param  hi2c1: 사용할 I2C 장치 핸들러 (I2C1 포트)
+       * @param  0xA0: 데이터를 보낼 슬레이브 장치 주소 (8비트 주소)
+       * @param  i2c_tx_data: 전송할 데이터가 담긴 변수 주소
+       * @param  1: 데이터 크기 (1 바이트)
+       * @param  1000: 타임아웃 시간 (ms 단위)
+       */
       HAL_I2C_Master_Transmit(&hi2c1, 0xA0, &i2c_tx_data, 1, 1000);
+      /**
+       * @brief  I2C 슬레이브 장치로부터 데이터를 수신하는 함수
+       * @param  hi2c1: 사용할 I2C 장치 핸들러 (I2C1 포트)
+       * @param  0xA0: 데이터를 받을 슬레이브 주소
+       * @param  i2c_rx_data: 수신한 데이터를 저장할 변수 주소
+       * @param  1: 수신할 바이트 수
+       * @param  1000: 타임아웃 시간
+       */
+
       HAL_I2C_Master_Receive(&hi2c1, 0xA0, &i2c_rx_data, 1, 1000);
 
       HAL_Delay(1000);  // 반복 방지용 딜레이
