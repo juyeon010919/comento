@@ -153,6 +153,14 @@ int main(void)
 
       uint8_t i2c_tx_data = 0x55;
       uint8_t i2c_rx_data = 0x00;
+      /*
+       * 본 코드에서는 7bit 기준 I2C 슬레이브 주소 0x50을 사용하였고,
+       * STM32 HAL 라이브러리에서는 8bit 주소를 요구하므로 0xA0을 입력하였습니다.
+       * 레지스터 주소는 명시적으로 포함되어 있지 않지만, 단순 테스트 목적의 전송 흐름으로
+       * 1바이트 데이터를 송수신하여 구조를 검증하는 코드입니다.
+       * 데이터는 테스트용으로 0x55를 전송하였고, 수신을 통해 응답이 오는지 확인합니다.
+       * 이는 향후 실습에서 실제 PMIC 제어용 레지스터를 다룰 수 있도록 기초 구조를 익히기 위한 과정입니다.
+       */
       /**
        * @brief  I2C 슬레이브 장치에 데이터를 전송하는 함수
        * @param  hi2c1: 사용할 I2C 장치 핸들러 (I2C1 포트)
@@ -514,7 +522,7 @@ static void MX_GPIO_Init(void)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
+  /* User can add HAL_I2C_Master_Transmit()his own implementation to report the HAL error return state */
   __disable_irq();
   while (1)
   {
