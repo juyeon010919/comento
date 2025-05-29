@@ -152,12 +152,15 @@ int main(void)
   );
 
   // HAL_I2C_Master_Transmit(); 각 함수의 매개변수 파악
-  uint8_t tx_data[2] = {0x01, 0xFF};  // 0x01: 레지스터 주소, 0xFF: 쓸 값
+  uint8_t vout_data[2] = {0x20, 0xA4};  // 0x20: BUCKA VOUT 레지스터, 0xA4 = 1.025V
+
+  // MP5475의 BUCKA 출력 전압을 1.025V로 설정하는 코드
+  // 6.25mV 단위로 설정되며, 0xA4 = 164 × 6.25mV = 1.025V
 
   HAL_I2C_Master_Transmit(
     &hi2c1,            // I2C 핸들
     MP5475_I2C_ADDR,   // 슬레이브 주소
-    tx_data,           // 전송할 데이터 배열 주소
+	vout_data,          // 전송할 데이터 배열 주소
     2,                 // 전송할 바이트 수 (2바이트)
     100                // 타임아웃 시간
   );
