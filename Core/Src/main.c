@@ -140,7 +140,7 @@ int main(void)
   MX_SPI3_Init();
   MX_ADC1_Init();
   MX_USB_DEVICE_Init();
-  //  HAL_I2C_Master_Transmit(), HAL_I2C_Master_Receive(); 각 함수의 매개변수 파악
+  // HAL_I2C_Master_Receive(); 각 함수의 매개변수 파악
   uint8_t rx_data[1] = {0};
 
   HAL_I2C_Master_Receive(
@@ -148,7 +148,18 @@ int main(void)
     MP5475_I2C_ADDR,   // 슬레이브 주소 (0x60을 8bit로 변환 → 0xC0)
     rx_data,           // 데이터를 저장할 변수 주소
     1,                 // 수신할 데이터 크기 (1바이트)
-    100                // 타임아웃 (ms, 응답 없으면 종료)
+    100                // 타임아웃 시간(ms, 응답 없으면 종료)
+  );
+
+  // HAL_I2C_Master_Transmit(); 각 함수의 매개변수 파악
+  uint8_t tx_data[2] = {0x01, 0xFF};  // 0x01: 레지스터 주소, 0xFF: 쓸 값
+
+  HAL_I2C_Master_Transmit(
+    &hi2c1,            // I2C 핸들
+    MP5475_I2C_ADDR,   // 슬레이브 주소
+    tx_data,           // 전송할 데이터 배열 주소
+    2,                 // 전송할 바이트 수 (2바이트)
+    100                // 타임아웃 시간
   );
   // Fault 상태 저장할 구조체 선언
   FaultStatus_t faultStatus;
