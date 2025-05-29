@@ -19,6 +19,26 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#define MP5475_I2C_ADDR  (0x60 << 1)
+typedef enum {
+    REG_FAULT_STATUS1 = 0x00,
+    REG_FAULT_STATUS2 = 0x01,
+    REG_FAULT_STATUS3 = 0x02
+} MP5475_Register_t;
+// enum 정의 바로 아래에 이어서 붙이기
+typedef union {
+    uint8_t all;
+    struct {
+        uint8_t BUCKA_FAULT : 1;
+        uint8_t BUCKB_FAULT : 1;
+        uint8_t BUCKC_FAULT : 1;
+        uint8_t BUCKD_FAULT : 1;
+        uint8_t LDO1_FAULT  : 1;
+        uint8_t LDO2_FAULT  : 1;
+        uint8_t TEMP_WARN   : 1;
+        uint8_t TEMP_SHDN   : 1;
+    } bits;
+} FaultStatus_t;
 #include "usb_device.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -120,6 +140,23 @@ int main(void)
   MX_SPI3_Init();
   MX_ADC1_Init();
   MX_USB_DEVICE_Init();
+  // Fault 상태 저장할 구조체 선언
+  FaultStatus_t faultStatus;
+  // MP5475의 REG_FAULT_STATUS1 (0x00번) 레지스터 읽기
+  HAL_I2C_Mem_Read(
+      &hi2c1,                    // I2C 핸들 (I2C1)
+      MP5475_I2C_ADDR,           // 슬레이브 주소 (0x60 << 1)
+      REG_FAULT_STATUS1,         // 레지스터 주소
+      I2C_MEMADD_SIZE_8BIT,      // 주소 크기 (8비트)
+      &faultStatus.all,          // 데이터를 저장할 위치 (8비트 전체)
+      1,                         // 바이트 수 (1바이트)
+      100                        // 타임아웃 (100ms)
+  );
+  // BUCKA 오류가 발생했는지 확인
+  if (faultStatus.bits.BUCKA_FAULT) {
+      // 나중에 여기에 오류 처리 로직을 넣을 수 있음
+      // 예: LED 켜기, UART로 메시지 출력 등
+  }
   /* USER CODE BEGIN 2 */
 
   uint8_t i2c_tx_data = 0;
