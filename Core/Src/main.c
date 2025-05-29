@@ -144,11 +144,11 @@ int main(void)
   uint8_t rx_data[1] = {0};
 
   HAL_I2C_Master_Receive(
-    &hi2c1,            // I2C 핸들 (hi2c1: STM32CubeMX에서 설정된 I2C1)
-    MP5475_I2C_ADDR,   // 슬레이브 주소 (0x60 << 1)
-    rx_data,           // 데이터를 저장할 공간
-    1,                 // 수신할 바이트 수 (1바이트)
-    100                // 타임아웃 (ms)
+    &hi2c1,            // I2C 핸들 (hi2c1: STM32CubeMX에서 설정된 포트)
+    MP5475_I2C_ADDR,   // 슬레이브 주소 (0x60을 8bit로 변환 → 0xC0)
+    rx_data,           // 데이터를 저장할 변수 주소
+    1,                 // 수신할 데이터 크기 (1바이트)
+    100                // 타임아웃 (ms, 응답 없으면 종료)
   );
   // Fault 상태 저장할 구조체 선언
   FaultStatus_t faultStatus;
