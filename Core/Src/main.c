@@ -25,20 +25,8 @@ typedef enum {
     REG_FAULT_STATUS2 = 0x01,
     REG_FAULT_STATUS3 = 0x02
 } MP5475_Register_t;
-// enum 정의 바로 아래에 이어서 붙이기
-typedef union {
-    uint8_t all;
-    struct {
-        uint8_t BUCKA_FAULT : 1;
-        uint8_t BUCKB_FAULT : 1;
-        uint8_t BUCKC_FAULT : 1;
-        uint8_t BUCKD_FAULT : 1;
-        uint8_t LDO1_FAULT  : 1;
-        uint8_t LDO2_FAULT  : 1;
-        uint8_t TEMP_WARN   : 1;
-        uint8_t TEMP_SHDN   : 1;
-    } bits;
-} FaultStatus_t;
+//
+
 #include "usb_device.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -102,7 +90,94 @@ static void MX_ADC1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-uint8_t addr = SLAVEADDR;
+#include "main.h"
+#include <stdio.h>
+
+// MP5475 I2C 슬레이브 주소 (8비트 주소 = 0x60 << 1 = 0xC0)
+#define MP5475_I2C_ADDR (0x60 << 1)
+#define REG_FAULT_STATUS1 0x00  // Fault 상태 레지스터 주소
+
+// Fault 상태 저장용 구조체 (비트 단위 확인 가능)
+typedef union {
+    uint8_t all;
+    struct {
+        uint8_t BUCKA_FAULT : 1;
+        uint8_t BUCKB_FAULT : 1;
+        uint8_t BUCKC_FAULT : 1;
+        uint8_t BUCKD_FAULT : 1;
+        uint8_t LDO1_FAULT  : 1;
+        uint8_t LDO2_FAULT  : 1;
+        uint8_t TEMP_WARN   : 1;
+        uint8_t TEMP_SHDN   : 1;
+    } bits;
+} FaultStatus_t;
+
+/// ===========================================
+/// 화이트박스 테스트 1
+/// 전체 Fault 상태 레지스터가 0인지 확인 (정상 상태)
+void Test_FaultStatus_NoFault(void) {
+    FaultStatus_t fault;
+
+    HAL_I2C_Mem_Read(&hi2c1, MP5475_I2C_ADDR,
+                     REG_FAULT_STATUS1,
+                     I2C_MEMADD_SIZE_8BIT,
+                     &fault.all, 1, 100);
+
+    if (fault.all == 0x00)
+        printf("[PASS] Fault 없음. 정상 상태입니다.\n");
+    else
+        printf("[FAIL] Fault 감지됨: 0x%02X\n", fault.all);
+}
+
+
+/// ===========================================
+/// 화이트박스 테스트 2
+/// BUCKA Fault 비트만 추출하여 감지 여부 확인
+void Test_BuckAFault_Triggered(void) {
+    FaultStatus_t fault;
+
+    HAL_I2C_Mem_Read(&hi2c1, MP5475_I2C_ADDR,
+                     REG_FAULT_STATUS1,
+                     I2C_MEMADD_SIZE_8BIT,
+                     &fault.all, 1, 100);
+
+    if (fault.bits.BUCKA_FAULT)
+        printf("[PASS] BUCKA Fault 감지됨\n");
+    else
+        printf("[FAIL] BUCKA Fault 미감지\n");
+}
+
+
+/// ===========================================
+/// 블랙박스 테스트 1
+/// BUCKA 출력 전압을 1.025V로 설정 후 성공 여부 판단
+void Test_SetVout_Normal(void) {
+    uint8_t vout_data[2] = {0x20, 0xA4};  // 0xA4 = 164 × 6.25mV = 1.025V
+
+    if (HAL_I2C_Master_Transmit(&hi2c1,
+                                MP5475_I2C_ADDR,
+                                vout_data, 2, 100) == HAL_OK)
+        printf("[PASS] 정상 전압 설정 완료\n");
+    else
+        printf("[FAIL] 전압 설정 실패\n");
+}
+
+
+/// ===========================================
+/// 블랙박스 테스트 2
+/// 존재하지 않는 주소 0xFF로 통신 → 오류 발생 확인
+void Test_InvalidI2CAddress(void) {
+    uint8_t dummy = 0x55;
+
+    if (HAL_I2C_Master_Transmit(&hi2c1,
+                                0xFF,  // 잘못된 주소
+                                &dummy, 1, 100) != HAL_OK)
+        printf("[PASS] 잘못된 주소 실패 처리 확인됨\n");
+    else
+        printf("[FAIL] 실패가 발생하지 않음 (비정상)\n");
+}
+
+
 /* USER CODE END 0 */
 
 /**
