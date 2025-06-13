@@ -93,88 +93,88 @@ static void MX_ADC1_Init(void);
 #include "main.h"
 #include <stdio.h>
 
-// MP5475 I2C 슬레이브 주소 (8비트 주소 = 0x60 << 1 = 0xC0)
-#define MP5475_I2C_ADDR (0x60 << 1)
-#define REG_FAULT_STATUS1 0x00  // Fault 상태 레지스터 주소
+// MPU6050 I2C 슬레이브 주소 (7bit = 0x68 → 8bit = 0xD0)
+#define MPU6050_I2C_ADDR (0x68 << 1)  // 0xD0
 
-// Fault 상태 저장용 구조체 (비트 단위 확인 가능)
-typedef union {
-    uint8_t all;
-    struct {
-        uint8_t BUCKA_FAULT : 1;
-        uint8_t BUCKB_FAULT : 1;
-        uint8_t BUCKC_FAULT : 1;
-        uint8_t BUCKD_FAULT : 1;
-        uint8_t LDO1_FAULT  : 1;
-        uint8_t LDO2_FAULT  : 1;
-        uint8_t TEMP_WARN   : 1;
-        uint8_t TEMP_SHDN   : 1;
-    } bits;
-} FaultStatus_t;
+// MPU6050의 주요 레지스터 주소를 enum으로 정의
+typedef enum {
+    WHO_AM_I     = 0x75,  // 디바이스 ID 레지스터
+    PWR_MGMT_1   = 0x6B,  // 전원 관리 레지스터
+    ACCEL_XOUT_H = 0x3B   // 가속도 X축 상위 바이트
+} MPU6050_Register_t;
 
 /// ===========================================
-/// 화이트박스 테스트 1
-/// 전체 Fault 상태 레지스터가 0인지 확인 (정상 상태)
-void Test_FaultStatus_NoFault(void) {
-    FaultStatus_t fault;
-
-    HAL_I2C_Mem_Read(&hi2c1, MP5475_I2C_ADDR,
-                     REG_FAULT_STATUS1,
-                     I2C_MEMADD_SIZE_8BIT,
-                     &fault.all, 1, 100);
-
-    if (fault.all == 0x00)
-        printf("[PASS] Fault 없음. 정상 상태입니다.\n");
+// White Box TC 1: WHO_AM_I 레지스터가 0x68인지 확인
+void Test_WHOAMI_Check(void) {
+    uint8_t whoami = 0;
+    HAL_I2C_Mem_Read(&hi2c1, MPU6050_I2C_ADDR, WHO_AM_I, I2C_MEMADD_SIZE_8BIT, &whoami, 1, 100);
+    if (whoami == 0x68)
+        printf("[PASS] WHO_AM_I = 0x%02X (정상)\n", whoami);
     else
-        printf("[FAIL] Fault 감지됨: 0x%02X\n", fault.all);
+        printf("[FAIL] WHO_AM_I = 0x%02X (비정상)\n", whoami);
 }
 
 
 /// ===========================================
-/// 화이트박스 테스트 2
-/// BUCKA Fault 비트만 추출하여 감지 여부 확인
-void Test_BuckAFault_Triggered(void) {
-    FaultStatus_t fault;
+// White Box TC 2: PWR_MGMT_1 레지스터에 0x00 쓰고 읽어서 sleep 모드 해제 확인
+void Test_PowerManagement_SleepDisable(void) {
+    uint8_t write_data = 0x00;  // sleep 비트 해제
+    HAL_I2C_Mem_Write(&hi2c1, MPU6050_I2C_ADDR, PWR_MGMT_1, I2C_MEMADD_SIZE_8BIT, &write_data, 1, 100);
 
-    HAL_I2C_Mem_Read(&hi2c1, MP5475_I2C_ADDR,
-                     REG_FAULT_STATUS1,
-                     I2C_MEMADD_SIZE_8BIT,
-                     &fault.all, 1, 100);
-
-    if (fault.bits.BUCKA_FAULT)
-        printf("[PASS] BUCKA Fault 감지됨\n");
+    uint8_t read_back = 0;
+    HAL_I2C_Mem_Read(&hi2c1, MPU6050_I2C_ADDR, PWR_MGMT_1, I2C_MEMADD_SIZE_8BIT, &read_back, 1, 100);
+    if (read_back == 0x00)
+        printf("[PASS] PWR_MGMT_1 = 0x00 (Sleep 해제 성공)\n");
     else
-        printf("[FAIL] BUCKA Fault 미감지\n");
+        printf("[FAIL] PWR_MGMT_1 = 0x%02X (Sleep 해제 실패)\n", read_back);
 }
 
 
 /// ===========================================
-/// 블랙박스 테스트 1
-/// BUCKA 출력 전압을 1.025V로 설정 후 성공 여부 판단
-void Test_SetVout_Normal(void) {
-    uint8_t vout_data[2] = {0x20, 0xA4};  // 0xA4 = 164 × 6.25mV = 1.025V
-
-    if (HAL_I2C_Master_Transmit(&hi2c1,
-                                MP5475_I2C_ADDR,
-                                vout_data, 2, 100) == HAL_OK)
-        printf("[PASS] 정상 전압 설정 완료\n");
+// White Box TC 3: ACCEL_XOUT_H 레지스터에서 가속도 X값 상위 바이트 수신 확인
+void Test_AccelX_Read(void) {
+    uint8_t accel_x_high = 0;
+    if (HAL_I2C_Mem_Read(&hi2c1, MPU6050_I2C_ADDR, ACCEL_XOUT_H, I2C_MEMADD_SIZE_8BIT, &accel_x_high, 1, 100) == HAL_OK)
+        printf("[PASS] ACCEL_XOUT_H 수신: 0x%02X\n", accel_x_high);
     else
-        printf("[FAIL] 전압 설정 실패\n");
+        printf("[FAIL] ACCEL_XOUT_H 수신 실패\n");
 }
 
 
 /// ===========================================
-/// 블랙박스 테스트 2
-/// 존재하지 않는 주소 0xFF로 통신 → 오류 발생 확인
-void Test_InvalidI2CAddress(void) {
-    uint8_t dummy = 0x55;
-
-    if (HAL_I2C_Master_Transmit(&hi2c1,
-                                0xFF,  // 잘못된 주소
-                                &dummy, 1, 100) != HAL_OK)
-        printf("[PASS] 잘못된 주소 실패 처리 확인됨\n");
+// Black Box TC 1: MPU6050 디바이스 존재 여부 확인 (WHO_AM_I 레지스터 응답)
+void Test_DeviceConnection(void) {
+    uint8_t id;
+    if (HAL_I2C_Mem_Read(&hi2c1, MPU6050_I2C_ADDR, WHO_AM_I, I2C_MEMADD_SIZE_8BIT, &id, 1, 100) == HAL_OK)
+        printf("[PASS] MPU6050 연결 성공 (응답 수신됨)\n");
     else
-        printf("[FAIL] 실패가 발생하지 않음 (비정상)\n");
+        printf("[FAIL] MPU6050 응답 없음 (통신 실패)\n");
+}
+
+
+/// ===========================================
+// Black Box TC 2: 존재하지 않는 레지스터(0x00)에 접근해 오류 발생 여부 확인
+void Test_InvalidRegisterAccess(void) {
+    uint8_t data;
+    if (HAL_I2C_Mem_Read(&hi2c1, MPU6050_I2C_ADDR, 0x00, I2C_MEMADD_SIZE_8BIT, &data, 1, 100) != HAL_OK)
+        printf("[PASS] 잘못된 레지스터 접근 시 실패 처리됨\n");
+    else
+        printf("[FAIL] 잘못된 레지스터 접근이 허용됨 (비정상)\n");
+}
+
+
+/// ===========================================
+// Black Box TC 3: Sleep 모드 설정 후 WHO_AM_I 응답이 안 오는지 확인 (비정상 시나리오)
+void Test_DeviceInSleepMode(void) {
+    uint8_t sleep_cmd = 0x40;  // sleep bit = 1
+    HAL_I2C_Mem_Write(&hi2c1, MPU6050_I2C_ADDR, PWR_MGMT_1, I2C_MEMADD_SIZE_8BIT, &sleep_cmd, 1, 100);
+
+    uint8_t id = 0;
+    HAL_I2C_Mem_Read(&hi2c1, MPU6050_I2C_ADDR, WHO_AM_I, I2C_MEMADD_SIZE_8BIT, &id, 1, 100);
+    if (id != 0x68)
+        printf("[PASS] Sleep 모드 진입 확인 (WHO_AM_I 비정상 응답: 0x%02X)\n", id);
+    else
+        printf("[FAIL] Sleep 상태인데도 정상 응답이 옴 (0x%02X)\n", id);
 }
 
 
@@ -240,43 +240,16 @@ int main(void)
     100                // 타임아웃 시간
   );
   // Fault 상태 저장할 구조체 선언
-  FaultStatus_t faultStatus;
-  // MP5475의 REG_FAULT_STATUS1 (0x00번) 레지스터 읽기
-  HAL_I2C_Mem_Read(
-      &hi2c1,                    // I2C 핸들 (I2C1)
-      MP5475_I2C_ADDR,           // 슬레이브 주소 (0x60 << 1)
-      REG_FAULT_STATUS1,         // 레지스터 주소
-      I2C_MEMADD_SIZE_8BIT,      // 주소 크기 (8비트)
-      &faultStatus.all,          // 데이터를 저장할 위치 (8비트 전체)
-      1,                         // 바이트 수 (1바이트)
-      100                        // 타임아웃 (100ms)
-  );
-  // BUCKA 오류가 발생했는지 확인
-  if (faultStatus.bits.BUCKA_FAULT) {
-      // 나중에 여기에 오류 처리 로직을 넣을 수 있음
-      // 예: LED 켜기, UART로 메시지 출력 등
-  }
+
   /* USER CODE BEGIN 2 */
 
-  uint8_t i2c_tx_data = 0;
-  uint8_t i2c_tx_addr = 0;
-  uint8_t i2c_rx_data = 0;
-  uint8_t i2c_rx_addr = 0;
+  Test_WHOAMI_Check();
+    Test_PowerManagement_SleepDisable();
+    Test_AccelX_Read();
 
-  union TEST1
-  {
-    uint8_t Pmic_data;
-    struct{
-        uint8_t a : 1;
-        uint8_t b : 1;
-        uint8_t c : 1;
-        uint8_t d : 1;
-        uint8_t e : 1;
-        uint8_t f : 1;
-        uint8_t g : 1;
-        uint8_t h : 1;
-    } field;
-  } test1;
+    Test_DeviceConnection();
+    Test_InvalidRegisterAccess();
+    Test_DeviceInSleepMode();
 
   /* USER CODE END 2 */
 
@@ -284,40 +257,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-      test1.field.a = 1;
-      i2c_tx_data = test1.Pmic_data;
-
-      uint8_t i2c_tx_data = 0x55;
-      uint8_t i2c_rx_data = 0x00;
-      /*
-       * 본 코드에서는 7bit 기준 I2C 슬레이브 주소 0x50을 사용하였고,
-       * STM32 HAL 라이브러리에서는 8bit 주소를 요구하므로 0xA0을 입력하였습니다.
-       * 레지스터 주소는 명시적으로 포함되어 있지 않지만, 단순 테스트 목적의 전송 흐름으로
-       * 1바이트 데이터를 송수신하여 구조를 검증하는 코드입니다.
-       * 데이터는 테스트용으로 0x55를 전송하였고, 수신을 통해 응답이 오는지 확인합니다.
-       * 이는 향후 실습에서 실제 PMIC 제어용 레지스터를 다룰 수 있도록 기초 구조를 익히기 위한 과정입니다.
-       */
-      /**
-       * @brief  I2C 슬레이브 장치에 데이터를 전송하는 함수
-       * @param  hi2c1: 사용할 I2C 장치 핸들러 (I2C1 포트)
-       * @param  0xA0: 데이터를 보낼 슬레이브 장치 주소 (8비트 주소)
-       * @param  i2c_tx_data: 전송할 데이터가 담긴 변수 주소
-       * @param  1: 데이터 크기 (1 바이트)
-       * @param  1000: 타임아웃 시간 (ms 단위)
-       */
-      HAL_I2C_Master_Transmit(&hi2c1, 0xA0, &i2c_tx_data, 1, 1000);
-      /**
-       * @brief  I2C 슬레이브 장치로부터 데이터를 수신하는 함수
-       * @param  hi2c1: 사용할 I2C 장치 핸들러 (I2C1 포트)
-       * @param  0xA0: 데이터를 받을 슬레이브 주소
-       * @param  i2c_rx_data: 수신한 데이터를 저장할 변수 주소
-       * @param  1: 수신할 바이트 수
-       * @param  1000: 타임아웃 시간
-       */
-
-      HAL_I2C_Master_Receive(&hi2c1, 0xA0, &i2c_rx_data, 1, 1000);
-
-      HAL_Delay(1000);  // 반복 방지용 딜레이
+	  HAL_Delay(1000);  // 1초마다 루프 반복
   }
   /* USER CODE END 3 */
 }
